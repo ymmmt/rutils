@@ -1,10 +1,3 @@
-;;; see LICENSE file for permissions
-
-(in-package #:rutils.sequence)
-(named-readtables:in-readtable rutils-readtable)
-(eval-when (:compile-toplevel)
-  (declaim #.+default-opts+))
-(declaim (inline safe-sort map*))
 
 
 (defun split-sequence (delimiter seq
@@ -13,16 +6,6 @@
                             (key nil key-supplied)
                             (test nil test-supplied)
                             (test-not nil test-not-supplied))
-  "Return a list of subsequences in SEQ delimited by DELIMITER.
-
-   If REMOVE-EMPTY-SUBSEQS is NIL, empty subsequences will
-   be included in the result; otherwise they will be discarded.
-   All other keywords work analogously to those for SUBSTITUTE.
-   In particular, the behavior of FROM-END is possibly different
-   from other versions of this function; FROM-END values of NIL
-   and T are equivalent unless COUNT is supplied. The second return
-   value is an index suitable as an argument to SUBSEQ into the
-   sequence indicating where processing stopped."
   (when seq
     (let ((len (length seq))
           (other-keys (nconc (when test-supplied
@@ -211,45 +194,6 @@
                  #`(coerce (reverse %) result-type)
                  rez)
             key-rez)))
-
-
-(declaim (inline remove/swapped-arguments))
-(defun remove/swapped-arguments (sequence item &rest keyword-arguments)
-  (apply #'remove item sequence keyword-arguments))
-
-(define-modify-macro removef (item &rest remove-keywords)
-  remove/swapped-arguments
-  "Modify-macro for REMOVE. Sets place designated by the first
-   argument to the result of calling REMOVE with ITEM, place,
-   and the REMOVE-KEYWORDS.")
-
-(declaim (inline delete/swapped-arguments))
-(defun delete/swapped-arguments (sequence item &rest keyword-arguments)
-  (apply #'delete item sequence keyword-arguments))
-
-(define-modify-macro deletef (item &rest remove-keywords)
-  delete/swapped-arguments
-  "Modify-macro for DELETE. Sets place designated by the first
-   argument to the result of calling DELETE with ITEM, place,
-   and the REMOVE-KEYWORDS.")
-
-
-(defmacro doindex ((index-var elt-var sequence &optional result-form)
-                   &body body)
-  "Iterates over a sequence while keeping track of an index. A DO-style macro.
-
-   Example usage:
-
-       CL-USER> (doindex (i e '(a b c))
-                  (format T \"~&~S ~S\" i e))
-       1 a
-       2 b
-       3 c"
-  (let ((sequence-var (gensym "SEQUENCE")))
-    `(let ((,sequence-var (coerce ,sequence 'vector)))
-       (dotimes (,index-var (length ,sequence-var) ,result-form)
-         (let ((,elt-var (elt ,sequence-var ,index-var)))
-           ,@body)))))
 
 (defun shuffle (sequence &key (start 0) end)
   "Return a shuffled copy of SEQUENCE (in bounds of START and END)."
