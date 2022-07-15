@@ -1,15 +1,1 @@
 
-(defun copy-array (arr)
-  "Create a fresh copy of the array ARR."
-  (let* ((dims (array-dimensions arr))
-         (dim-count (length dims))
-         (rez (make-array dims :element-type (array-element-type arr))))
-    (labels ((drill-down (is)
-               (if (= (length is) dim-count)
-                   (setf (apply #'aref rez is)
-                         (apply #'aref arr is))
-                   (dotimes (i (array-dimension arr (- dim-count (length is) 1)))
-                     (drill-down (cons i is))))))
-      (dotimes (i (array-dimension arr (1- dim-count)))
-        (drill-down (list i))))
-    rez))
