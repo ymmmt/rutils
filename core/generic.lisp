@@ -1,12 +1,3 @@
-;;; see LICENSE file for permissions
-
-(in-package #:rutils.generic)
-(named-readtables:in-readtable rutils-readtable)
-(eval-when (:compile-toplevel)
-  (declaim #.+default-opts+))
-
-(declaim (inline copy smart-slot-value smart-set-slot-value))
-
 (defmacro adding-smart-slot-methods (obj slot expr)
   (with-gensyms (err class name alt args val)
     `(handler-case ,expr
@@ -60,50 +51,7 @@
 
 (defsetf smart-slot-value smart-set-slot-value)
 
-
 ;;; generic element access protocol
-
-(define-condition generic-elt-error ()
-  ((obj :accessor generic-elt-error-obj :initarg :obj)
-   (key :accessor generic-elt-error-key :initarg :key)))
-
-(defmethod print-object ((err generic-elt-error) stream)
-  (format stream
-          "Generic element access error: object ~A can't be accessed by key: ~A"
-          (slot-value err 'obj) (slot-value err 'key)))
-
-(defgeneric generic-elt (obj key &rest keys)
-  (:documentation
-   "Generic element access in OBJ by KEY.
-    Supports chaining with KEYS.")
-  (:method :around (obj key &rest keys)
-    (reduce #'generic-elt keys :initial-value (call-next-method obj key)))
-  (:method (obj key &rest keys)
-    (declare (ignore keys))
-    (error 'generic-elt-error :obj obj :key key)))
-
-(defmethod generic-elt ((obj list) key &rest keys)
-  (declare (ignore keys))
-  (when (minusp key) (setf key (+ (length obj) key)))
-  (nth key obj))
-
-(defmethod generic-elt ((obj vector) key &rest keys)
-  (declare (ignore keys))
-  (when (minusp key) (setf key (+ (length obj) key)))
-  (aref obj key))
-
-(defmethod generic-elt ((obj array) (key list) &rest keys)
-  (declare (ignore keys))
-  (apply 'aref obj key))
-
-(defmethod generic-elt ((obj sequence) key &rest keys)
-  (declare (ignore keys))
-  (when (minusp key) (setf key (+ (length obj) key)))
-  (elt obj key))
-
-(defmethod generic-elt ((obj hash-table) key &rest keys)
-  (declare (ignore keys))
-  (get# key obj))
 
 (defmethod generic-elt ((obj structure-object) key &rest keys)
   (declare (ignore keys))
@@ -118,9 +66,6 @@
   (error "Can't access NIL with generic-elt!"))
 
 (defgeneric generic-setf (obj key &rest keys-and-val)
-  (:documentation
-   "Generic element access in OBJ by KEY.
-    Supports chaining with KEYS.")
   (:method :around (obj key &rest keys-and-val)
     (if (single keys-and-val)
         (call-next-method)
@@ -128,77 +73,3 @@
           (apply #'generic-setf
                  (apply #'generic-elt obj key prev-keys)
                  kv)))))
-
-(defmethod generic-setf ((obj (eql nil)) key &rest keys)
-  (declare (ignore key keys))
-  (error "Can't access NIL with generic-setf!"))
-
-(defmethod generic-setf ((obj list) key &rest keys-and-val)
-  (setf (nth key obj) (atomize keys-and-val)))
-
-(defmethod generic-setf ((obj vector) key &rest keys-and-val)
-  (setf (aref obj key) (atomize keys-and-val)))
-
-(defmethod generic-setf ((obj sequence) key &rest keys-and-val)
-  (setf (elt obj key) (atomize keys-and-val)))
-
-(defmethod generic-setf ((obj hash-table) key &rest keys-and-val)
-  (set# key obj (atomize keys-and-val)))
-
-(defmethod generic-setf ((obj structure-object) key &rest keys-and-val)
-  (setf (smart-slot-value obj key) (atomize keys-and-val)))
-
-(defmethod generic-setf ((obj standard-object) key &rest keys-and-val)
-  (setf (smart-slot-value obj key) (atomize keys-and-val)))
-
-(defsetf generic-elt generic-setf)
-
-
-;;; generic copy
-
-(defgeneric copy (obj &rest kvs)
-  (:documentation
-   "Create a shallow copy of an object.
-    If KVS are specified, they may be used to update the relevant parts
-    (like slots of an object, keys in a hash-table
-     or indexed elements of a sequence).")
-  (:method ((obj list) &rest kvs)
-    (let ((rez (copy-list obj)))
-      (when kvs
-        (do ((tail rez (rest tail))
-             (i 0 (1+ i))
-             (kv-tail (sort (group 2 kvs) '< :key 'lt)
-                      (rest kv-tail)))
-            ((or (null tail)
-                 (null kv-tail)))
-          (destructuring-bind (k v) (first kv-tail)
-            (when (= i k)
-              (:= (car tail) v)))))
-      rez))
-  (:method ((obj sequence) &rest kvs)
-    (let ((rez (copy-seq obj)))
-      (loop :for (k v) :on kvs :by #'cddr :do
-        (:= (aref rez k) v))
-      rez))
-  (:method ((obj hash-table) &rest kvs)
-    (let ((rez (copy-hash-table obj)))
-      (loop :for (k v) :on kvs :by #'cddr :do
-        (set# k rez v))
-      rez))
-  (:method ((obj structure-object) &rest kvs)
-    (let ((rez (copy-structure obj)))
-      (loop :for (k v) :on kvs :by #'cddr :do
-        (:= (smart-slot-value rez (mksym k)) v))
-      rez)))
-
-
-;;; generic count
-
-(defgeneric tally (obj)
-  (:documentation
-   "Return the count of items in a collection or other compound object.")
-  (:method ((obj sequence))
-    (length obj))
-  (:method ((obj hash-table))
-    (hash-table-count obj)))
-
